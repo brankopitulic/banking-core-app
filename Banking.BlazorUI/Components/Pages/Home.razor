@@ -1,0 +1,290 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@using Banking.Application.Interfaces
+@using Banking.Application.DTOs
+@inject IBankingService BankingService
+
+<PageTitle>Banking System</PageTitle>
+
+<h1>Banking System</h1>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @(isError ? "alert-danger" : "alert-success")">
+        @message
+    </div>
+}
+
+<div style="margin-bottom: 30px;">
+    <h3>Create Account</h3>
+    <div>
+        <label>Account Holder Name:</label>
+        <input @bind="newAccountHolder" type="text" />
+    </div>
+    <div>
+        <label>Initial Deposit:</label>
+        <input @bind="initialDeposit" type="number" step="0.01" />
+    </div>
+    <button @onclick="CreateAccount">Create Account</button>
+</div>
+
+<div style="margin-bottom: 30px;">
+    <h3>Deposit</h3>
+    <div>
+        <label>Account Number:</label>
+        <input @bind="depositAccountNumber" type="text" />
+    </div>
+    <div>
+        <label>Amount:</label>
+        <input @bind="depositAmount" type="number" step="0.01" />
+    </div>
+    <button @onclick="Deposit">Deposit</button>
+</div>
+
+<div style="margin-bottom: 30px;">
+    <h3>Withdraw</h3>
+    <div>
+        <label>Account Number:</label>
+        <input @bind="withdrawAccountNumber" type="text" />
+    </div>
+    <div>
+        <label>Amount:</label>
+        <input @bind="withdrawAmount" type="number" step="0.01" />
+    </div>
+    <button @onclick="Withdraw">Withdraw</button>
+</div>
+
+<div style="margin-bottom: 30px;">
+    <h3>Transfer</h3>
+    <div>
+        <label>From Account Number:</label>
+        <input @bind="transferFromAccount" type="text" />
+    </div>
+    <div>
+        <label>To Account Number:</label>
+        <input @bind="transferToAccount" type="text" />
+    </div>
+    <div>
+        <label>Amount:</label>
+        <input @bind="transferAmount" type="number" step="0.01" />
+    </div>
+    <button @onclick="Transfer">Transfer</button>
+</div>
+
+<div>
+    <h3>All Accounts</h3>
+    <button @onclick="RefreshAccounts">Refresh</button>
+    <table border="1" cellpadding="5" style="margin-top: 10px; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th>Account Number</th>
+                <th>Account Holder</th>
+                <th>Balance</th>
+                <th>Created Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var account in accounts)
+            {
+                <tr>
+                    <td>@account.AccountNumber</td>
+                    <td>@account.AccountHolderName</td>
+                    <td>$@account.Balance.ToString("N2")</td>
+                    <td>@account.CreatedDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private string newAccountHolder = string.Empty;
+    private decimal initialDeposit = 0;
+    private string depositAccountNumber = string.Empty;
+    private decimal depositAmount = 0;
+    private string withdrawAccountNumber = string.Empty;
+    private decimal withdrawAmount = 0;
+    private string transferFromAccount = string.Empty;
+    private string transferToAccount = string.Empty;
+    private decimal transferAmount = 0;
+    private string message = string.Empty;
+    private bool isError = false;
+    private List<AccountDto> accounts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAccounts();
+    }
+
+    private async Task CreateAccount()
+    {
+        try
+        {
+            var dto = new CreateAccountDto(newAccountHolder, initialDeposit);
+            var account = await BankingService.CreateAccountAsync(dto);
+            ShowSuccess($"Account created successfully! Account Number: {account.AccountNumber}");
+            newAccountHolder = string.Empty;
+            initialDeposit = 0;
+            await RefreshAccounts();
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+    }
+
+    private async Task Deposit()
+    {
+        try
+        {
+            var success = await BankingService.DepositAsync(new DepositDto(depositAccountNumber, depositAmount));
+            if (success)
+            {
+                var account = await BankingService.GetAccountByNumberAsync(depositAccountNumber);
+                ShowSuccess($"Deposit successful! New balance: ${account?.Balance:N2}");
+                depositAccountNumber = string.Empty;
+                depositAmount = 0;
+                await RefreshAccounts();
+            }
+            else
+            {
+                ShowError("Account not found.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+    }
+
+    private async Task Withdraw()
+    {
+        try
+        {
+            var success = await BankingService.WithdrawAsync(new WithdrawDto(withdrawAccountNumber, withdrawAmount));
+            if (success)
+            {
+                var account = await BankingService.GetAccountByNumberAsync(withdrawAccountNumber);
+                ShowSuccess($"Withdrawal successful! New balance: ${account?.Balance:N2}");
+                withdrawAccountNumber = string.Empty;
+                withdrawAmount = 0;
+                await RefreshAccounts();
+            }
+            else
+            {
+                ShowError("Account not found or insufficient funds.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+    }
+
+    private async Task Transfer()
+    {
+        try
+        {
+            var success = await BankingService.TransferAsync(new TransferDto(transferFromAccount, transferToAccount, transferAmount));
+            if (success)
+            {
+                var fromAccount = await BankingService.GetAccountByNumberAsync(transferFromAccount);
+                var toAccount = await BankingService.GetAccountByNumberAsync(transferToAccount);
+                ShowSuccess($"Transfer successful! From balance: ${fromAccount?.Balance:N2}, To balance: ${toAccount?.Balance:N2}");
+                transferFromAccount = string.Empty;
+                transferToAccount = string.Empty;
+                transferAmount = 0;
+                await RefreshAccounts();
+            }
+            else
+            {
+                ShowError("One or both accounts not found or insufficient funds.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+    }
+
+    private async Task RefreshAccounts()
+    {
+        accounts = (await BankingService.GetAllAccountsAsync()).ToList();
+    }
+
+    private void ShowSuccess(string msg)
+    {
+        message = msg;
+        isError = false;
+    }
+
+    private void ShowError(string msg)
+    {
+        message = msg;
+        isError = true;
+    }
+}
+
+<style>
+    div {
+        margin-bottom: 10px;
+    }
+
+    label {
+        display: inline-block;
+        width: 200px;
+        font-weight: bold;
+    }
+
+    input {
+        padding: 5px;
+        width: 200px;
+    }
+
+    button {
+        padding: 8px 16px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+    button:hover {
+        background-color: #0056b3;
+    }
+
+    table {
+        width: 100%;
+        margin-top: 20px;
+    }
+
+    th {
+        background-color: #f2f2f2;
+        padding: 10px;
+        text-align: left;
+    }
+
+    td {
+        padding: 8px;
+    }
+
+    .alert {
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+</style>
+

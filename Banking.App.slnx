@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Banking.Application/Banking.Application.csproj" />
+  <Project Path="Banking.BlazorUI/Banking.BlazorUI.csproj" />
+  <Project Path="Banking.Domain/Banking.Domain.csproj" />
+  <Project Path="Banking.Infrastructure/Banking.Infrastructure.csproj" />
+</Solution>
